@@ -9,9 +9,20 @@ VimRepress is a plugin for managing wordpress blog from Vim,  a rewritten  of vi
 
 Now **VimRepressEx** use **Pygments** to prettify source code, see
 
-	[](http://pygments.org)
+	http://pygments.org
 
-COMMAND EXAMPLES 
+## Installation
+
+To install using Vundle, add this line to your `.vimrc` file:
+
+	Plugin 'joywek/VimRepressEx'
+
+To install using pathogen.vim:
+
+	cd ~/.vim/bundle
+	git clone https://github.com/mattn/emmet-vim.git
+
+## Command Examples
 
 Some commands list above contain special usage, example below may clearify them for you. 
 
