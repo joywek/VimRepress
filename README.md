@@ -13,6 +13,10 @@ Now **VimRepressEx** use **Pygments** to prettify source code, see
 
 ## Installation
 
+The VimRepressEx depends on Python-Markdown and Pygments, you should install them first:
+
+	pip install markdown pygments
+
 To install using Vundle, add this line to your `.vimrc` file:
 
 	Plugin 'joywek/VimRepressEx'
