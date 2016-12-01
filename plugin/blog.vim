@@ -397,7 +397,7 @@ class ContentStruct(object):
     def META_TEMPLATE(self):
         KEYS_BASIC = ("StrID", "Title", "Slug")
         KEYS_EXT = ("Cats", "Tags")
-        KEYS_BLOG = ("EditType", "EditFormat", "BlogAddr")
+        KEYS_BLOG = ("EditType", "EditFormat")
 
         pt = ['"{k:<6}: {{{t}}}'.format(k=p, t=p.lower()) for p in KEYS_BASIC]
         if self.EDIT_TYPE == "post":
@@ -725,10 +725,6 @@ def blog_save(pub = None):
     cp = g_data.current_post
     assert cp is not None, "Can't get current post obj."
     cp.refresh_from_buffer()
-
-    if cp.buffer_meta["blogaddr"] != g_data.blog_url and cp.post_id != '':
-        confirm = vim_input("Are u sure saving it to \"%s\" ? BlogAddr in current buffer does NOT matched. \nStill saving it ? (may cause data lost) [yes/NO]" % g_data.blog_url)
-        assert confirm.lower() == 'yes', "Aborted."
 
     cp.post_status = pub
     cp.save_post()
