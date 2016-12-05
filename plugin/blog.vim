@@ -420,13 +420,6 @@ class ContentStruct(object):
         self.EDIT_TYPE = edit_type
         self.buffer_meta = dict(strid='', edittype=edit_type, blogaddr=config['blog_url'])
 
-        self.post_struct_meta = dict(title='',
-                wp_slug='',
-                post_type=edit_type,
-                description='',
-                custom_fields=[],
-                post_status='draft')
-
         if post_id is not None:
             self.refresh_from_wp(post_id)
 
@@ -488,13 +481,18 @@ class ContentStruct(object):
         self.parse_buffer()
 
         meta = self.buffer_meta
-        struct = self.post_struct_meta
- 
-        echomsg("meta=%s", meta)
-        echomsg("struct = %s", struct)
+        struct = dict(
+            title='',
+            wp_slug='',
+            post_type=self.EDIT_TYPE,
+            description='',
+            custom_fields=[],
+            post_status='draft')
 
-        struct.update(title=meta["title"],
-                wp_slug=meta["slug"], post_type=self.EDIT_TYPE)
+ 
+        struct.update(title = meta["title"],
+                      wp_slug = meta["slug"], 
+                      post_type = self.EDIT_TYPE)
 
         if self.EDIT_TYPE == "post":
             struct.update(categories=meta["cats"].split(','),
@@ -517,6 +515,8 @@ class ContentStruct(object):
             struct["description"] = self.html_text = md.convert(rawtext)
         else:
             struct["description"] = self.html_text = rawtext
+
+        self.post_struct_meta = struct
 
     def refresh_from_wp(self, post_id):
          # get from wp
