@@ -511,7 +511,7 @@ class ContentStruct(object):
                 field = dict(key=G.CUSTOM_FIELD_KEY, value=rawtext)
                 struct["custom_fields"].append(field)
 
-            md = markdown.Markdown(extensions=['pretty'])
+            md = markdown.Markdown(extensions=['pretty', 'tables'])
             struct["description"] = self.html_text = md.convert(rawtext)
         else:
             struct["description"] = self.html_text = rawtext
