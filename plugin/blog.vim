@@ -109,6 +109,9 @@ except ImportError:
 import sys
 sys.path.append(vim.eval('s:scriptfolder'))
 
+def is_str_empty(str):
+    return str is None or len(str) == 0
+
 def exception_check(func):
     def __check(*args, **kwargs):
         try:
@@ -185,6 +188,7 @@ class DataObject(object):
                 self.post_cache[''] = post
 
         assert post is not None, "current_post, no way to return None"
+
         return post
 
     @current_post.setter
@@ -231,24 +235,21 @@ class DataObject(object):
                     blog_url = config['blog_url']
                 except KeyError, e:
                     raise VimPressException("Configuration error: %s" % e)
-                echomsg("Connecting to '%s' ... " % blog_url)
+
                 if blog_password == '':
-                    blog_password = vim_input(
-                            "Enter password for %s" % blog_url, True)
-                config["xmlrpc_obj"] = wp_xmlrpc(blog_url,
-                        blog_username, blog_password)
+                    blog_password = vim_input("Enter password for %s" % blog_url, True)
+                config["xmlrpc_obj"] = wp_xmlrpc(blog_url, blog_username, blog_password)
 
             self.__xmlrpc = config["xmlrpc_obj"]
 
             # Setting tags and categories for completefunc
-            categories = config.get("categories", None)
-            if categories is None:
-                categories = [i["description"].encode("utf-8")
-                        for i in self.xmlrpc.get_categories()]
-                config["categories"] = categories
+            #categories = config.get("categories", None)
+            #if categories is None:
+            #    categories = [i["description"].encode("utf-8") for i in self.xmlrpc.get_categories()]
+            #    config["categories"] = categories
 
-            vim.command('let s:completable = "%s"' % '|'.join(categories))
-            echomsg("done.")
+            #vim.command('let s:completable = "%s"' % '|'.join(categories))
+
         return self.__xmlrpc
 
     @property
@@ -326,9 +327,9 @@ class wp_xmlrpc(object):
         self.mt_api = p.mt
         self.demo_api = p.demo
 
-        assert self.demo_api.sayHello() == "Hello!", \
-                    "XMLRPC Error with communication with '%s'@'%s'" % \
-                    (username, blog_url)
+        #assert self.demo_api.sayHello() == "Hello!", \
+        #            "XMLRPC Error with communication with '%s'@'%s'" % \
+        #            (username, blog_url)
 
         self.cache_reset()
         self.post_cache = dict()
@@ -414,9 +415,10 @@ class ContentStruct(object):
 
     def __init__(self, edit_type=None, post_id=None):
 
+        config = g_data.config[g_data.conf_index]
+
         self.EDIT_TYPE = edit_type
-        self.buffer_meta = dict(strid='', edittype=edit_type,
-                blogaddr=g_data.blog_url)
+        self.buffer_meta = dict(strid='', edittype=edit_type, blogaddr=config['blog_url'])
 
         self.post_struct_meta = dict(title='',
                 wp_slug='',
@@ -487,6 +489,9 @@ class ContentStruct(object):
 
         meta = self.buffer_meta
         struct = self.post_struct_meta
+ 
+        echomsg("meta=%s", meta)
+        echomsg("struct = %s", struct)
 
         struct.update(title=meta["title"],
                 wp_slug=meta["slug"], post_type=self.EDIT_TYPE)
@@ -560,15 +565,13 @@ class ContentStruct(object):
             if ps.get("postid", '') == '' and self.post_id == '':
                 post_id = g_data.xmlrpc.new_post(ps)
             else:
-                post_id = ps["postid"] if "postid" in ps \
-                        else int(self.post_id)
+                post_id = ps["postid"] if "postid" in ps else int(self.post_id)
                 g_data.xmlrpc.edit_post(post_id, ps)
         else:
             if ps.get("page_id", '') == '' and self.post_id == '':
                 post_id = g_data.xmlrpc.new_post(ps)
             else:
-                post_id = ps["page_id"] if "page_id" in ps \
-                        else int(self.post_id)
+                post_id = ps["page_id"] if "page_id" in ps else int(self.post_id)
                 g_data.xmlrpc.edit_post(post_id, ps)
 
         self.refresh_from_wp(post_id)
@@ -688,9 +691,7 @@ def blog_wise_open_view():
     """
     Wisely decides whether to wipe out the content of current buffer or open a new splited window.
     """
-    if vim.current.buffer.name is None and \
-            (vim.eval('&modified') == '0' or
-                len(vim.current.buffer) == 1):
+    if is_str_empty(vim.current.buffer.name) and (vim.eval('&modified') == '0' or len(vim.current.buffer) == 1):
         vim.command('setl modifiable')
         del vim.current.buffer[:]
         vim.command('setl nomodified')
@@ -733,7 +734,6 @@ def blog_save(pub = None):
     notify = "%s ID=%s saved with status '%s'" % (cp.post_status, cp.post_id, cp.post_status)
     echomsg(notify)
     vim.command('setl nomodified')
-
 
 @exception_check
 @vim_encoding_check
