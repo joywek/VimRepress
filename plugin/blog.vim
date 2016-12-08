@@ -90,6 +90,7 @@ import os
 import mimetypes
 import webbrowser
 import tempfile
+import datetime
 from ConfigParser import SafeConfigParser
 
 try:
@@ -397,7 +398,7 @@ class ContentStruct(object):
     @property
     def META_TEMPLATE(self):
         KEYS_BASIC = ("StrID", "Title", "Slug")
-        KEYS_EXT = ("Cats", "Tags")
+        KEYS_EXT = ("Cats", "Tags", "Date")
         KEYS_BLOG = ("EditType", "EditFormat")
 
         pt = ['"{k:<6}: {{{t}}}'.format(k=p, t=p.lower()) for p in KEYS_BASIC]
@@ -447,7 +448,7 @@ class ContentStruct(object):
 
     def fill_buffer(self):
         meta = dict(strid="", title="", slug="",
-                cats="", tags="", editformat="Markdown", edittype="")
+                cats="", tags="", date="", editformat="Markdown", edittype="")
         meta.update(self.buffer_meta)
         meta_text = self.META_TEMPLATE.format(**meta)\
                 .encode('utf-8').splitlines()
@@ -489,15 +490,18 @@ class ContentStruct(object):
             custom_fields=[],
             post_status='draft')
 
- 
         struct.update(title = meta["title"],
-                      wp_slug = meta["slug"], 
+                      wp_slug = meta["slug"],
                       post_type = self.EDIT_TYPE)
 
         if self.EDIT_TYPE == "post":
             struct.update(categories=meta["cats"].split(','),
                     mt_keywords=meta["tags"].split(','))
 
+        if meta.has_key("date") and meta["date"] != '':
+            dt = datetime.datetime.strptime(meta["date"], "%Y%m%dT%H:%M:%S")
+            struct.update(date_created_gmt=xmlrpclib.DateTime(dt))
+            
         self.rawtext = rawtext = meta["content"]
 
         #Translate markdown and save in custom fields.
@@ -527,6 +531,10 @@ class ContentStruct(object):
         meta = dict(editformat="HTML",
                 title=struct["title"],
                 slug=struct["wp_slug"])
+
+        if self.buffer_meta["date"] == '':
+            meta.update(date=struct["date_created_gmt"])
+            return
 
         if self.EDIT_TYPE == "post":
             meta.update(strid=str(struct["postid"]),
