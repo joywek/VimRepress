@@ -534,7 +534,6 @@ class ContentStruct(object):
 
         if self.buffer_meta["date"] == '':
             meta.update(date=struct["date_created_gmt"])
-            return
 
         if self.EDIT_TYPE == "post":
             meta.update(strid=str(struct["postid"]),
@@ -564,7 +563,6 @@ class ContentStruct(object):
             self.raw_text = content
 
         meta["content"] = content
-
         self.buffer_meta.update(meta)
 
     def save_post(self):
@@ -741,7 +739,7 @@ def blog_save(pub = None):
     g_data.current_post = cp
     notify = "%s ID=%s saved with status '%s'" % (cp.post_status, cp.post_id, cp.post_status)
     echomsg(notify)
-    vim.command('setl nomodified')
+	# vim.command('setl nomodified')
 
 @exception_check
 @vim_encoding_check
