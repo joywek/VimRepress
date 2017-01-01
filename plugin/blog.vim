@@ -57,7 +57,7 @@ if !has("python")
     finish
 endif
 
-let s:scriptfolder = expand('<sfile>:p:h').'/lib'
+let s:scriptfolder = expand('<sfile>:p:h')
 
 function! CompSave(ArgLead, CmdLine, CursorPos)
   return "publish\ndraft\n"
@@ -107,8 +107,10 @@ except ImportError:
 
         markdown = markdown_stub()
 
+plugin_dir = vim.eval('s:scriptfolder')
+
 import sys
-sys.path.append(vim.eval('s:scriptfolder'))
+sys.path.append(plugin_dir + '/lib')
 
 def is_str_empty(str):
     return str is None or len(str) == 0
@@ -601,9 +603,10 @@ class ContentStruct(object):
         if g_data.vimpress_temp_dir == '':
             g_data.vimpress_temp_dir = tempfile.mkdtemp(suffix="vimpress")
 
-        html = \
-                u"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <title>Vimpress Local Preview: %(title)s</title> <style type="text/css"> ul, li { margin: 1em; } :link,:visited { text-decoration:none } h1,h2,h3,h4,h5,h6,pre,code { font-size:1.1em; } h1 {font-size: 1.8em;} h2 {font-size: 1.5em;} h3{font-size: 1.3em;} h4{font-size: 1.2em;} h5 {font-size: 1.1em;} a img,:link img,:visited img { border:none } body { margin:0 auto; width:770px; font-family: Helvetica, Arial, Sans-serif; font-size:12px; color:#444; } </style> </meta> </head> <body> %(content)s </body> </html>
-""" % dict(content=self.html_text, title=self.buffer_meta["title"])
+        css_path = os.path.abspath(os.path.join(plugin_dir, os.path.pardir))
+        css_path = css_path + '/themes/preview/github.css'
+
+        html = u"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <title>Vimpress Local Preview: %(title)s</title> <link type="text/css" rel="stylesheet" href="%(css)s" /> </meta> </head> <body> %(content)s </body> </html>""" % dict(content=self.html_text, title=self.buffer_meta["title"], css=css_path)
         with open(os.path.join(
                 g_data.vimpress_temp_dir, "vimpress_temp.html"), 'w') as f:
             f.write(html.encode('utf-8'))
