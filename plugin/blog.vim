@@ -594,6 +594,13 @@ class ContentStruct(object):
 
     post_id = property(lambda self: self.buffer_meta["strid"])
 
+    post_title = property(lambda self: self.buffer_meta["title"])
+
+    @post_title.setter
+    def post_title(self, data):
+        if data is not None:
+            self.buffer_meta["title"] = data.decode("utf-8")
+
     def html_preview(self):
         """
         Opens a browser with a local preview of the content.
@@ -700,6 +707,7 @@ def blog_wise_open_view():
     """
     Wisely decides whether to wipe out the content of current buffer or open a new splited window.
     """
+
     if is_str_empty(vim.current.buffer.name) and (vim.eval('&modified') == '0' or len(vim.current.buffer) == 1):
         vim.command('setl modifiable')
         del vim.current.buffer[:]
@@ -747,7 +755,7 @@ def blog_save(pub = None):
 @exception_check
 @vim_encoding_check
 @view_switch(view = "edit")
-def blog_new(edit_type = "post", currentContent = None):
+def blog_new(title, edit_type = "post", currentContent = None):
     """
     Creates a new editing buffer of specified type.
     @params edit_type - either "post" or "page"
@@ -756,9 +764,11 @@ def blog_new(edit_type = "post", currentContent = None):
         raise VimPressException("Invalid option: %s " % edit_type)
     blog_wise_open_view()
     g_data.current_post = ContentStruct(edit_type = edit_type)
+    g_data.current_post.post_title = title
     cp = g_data.current_post
     cp.fill_buffer()
-
+    if title:
+        vim.current.buffer.name = title + ".md"
 
 @view_switch(view = "edit")
 def blog_edit(edit_type, post_id):
