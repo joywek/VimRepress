@@ -738,8 +738,8 @@ def blog_save(pub = None):
     Saves the current editing buffer.
     @params pub - either "draft" or "publish"
     """
-    if pub not in ("publish", "draft", None):
-        raise VimPressException(":BlogSave draft|publish")
+    if pub not in ("publish", "draft", "private", None):
+        raise VimPressException(":BlogSave draft|publish|private")
     cp = g_data.current_post
     assert cp is not None, "Can't get current post obj."
     cp.refresh_from_buffer()
