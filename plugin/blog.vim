@@ -57,7 +57,7 @@ if !has("python")
     finish
 endif
 
-let s:scriptfolder = expand('<sfile>:p:h').'/lib'
+let s:scriptfolder = expand('<sfile>:p:h')
 
 function! CompSave(ArgLead, CmdLine, CursorPos)
   return "publish\ndraft\n"
@@ -90,6 +90,7 @@ import os
 import mimetypes
 import webbrowser
 import tempfile
+import datetime
 from ConfigParser import SafeConfigParser
 
 try:
@@ -106,8 +107,13 @@ except ImportError:
 
         markdown = markdown_stub()
 
+plugin_dir = vim.eval('s:scriptfolder')
+
 import sys
-sys.path.append(vim.eval('s:scriptfolder'))
+sys.path.append(plugin_dir + '/lib')
+
+def is_str_empty(str):
+    return str is None or len(str) == 0
 
 def exception_check(func):
     def __check(*args, **kwargs):
@@ -185,6 +191,7 @@ class DataObject(object):
                 self.post_cache[''] = post
 
         assert post is not None, "current_post, no way to return None"
+
         return post
 
     @current_post.setter
@@ -231,24 +238,21 @@ class DataObject(object):
                     blog_url = config['blog_url']
                 except KeyError, e:
                     raise VimPressException("Configuration error: %s" % e)
-                echomsg("Connecting to '%s' ... " % blog_url)
+
                 if blog_password == '':
-                    blog_password = vim_input(
-                            "Enter password for %s" % blog_url, True)
-                config["xmlrpc_obj"] = wp_xmlrpc(blog_url,
-                        blog_username, blog_password)
+                    blog_password = vim_input("Enter password for %s" % blog_url, True)
+                config["xmlrpc_obj"] = wp_xmlrpc(blog_url, blog_username, blog_password)
 
             self.__xmlrpc = config["xmlrpc_obj"]
 
             # Setting tags and categories for completefunc
-            categories = config.get("categories", None)
-            if categories is None:
-                categories = [i["description"].encode("utf-8")
-                        for i in self.xmlrpc.get_categories()]
-                config["categories"] = categories
+            #categories = config.get("categories", None)
+            #if categories is None:
+            #    categories = [i["description"].encode("utf-8") for i in self.xmlrpc.get_categories()]
+            #    config["categories"] = categories
 
-            vim.command('let s:completable = "%s"' % '|'.join(categories))
-            echomsg("done.")
+            #vim.command('let s:completable = "%s"' % '|'.join(categories))
+
         return self.__xmlrpc
 
     @property
@@ -326,9 +330,9 @@ class wp_xmlrpc(object):
         self.mt_api = p.mt
         self.demo_api = p.demo
 
-        assert self.demo_api.sayHello() == "Hello!", \
-                    "XMLRPC Error with communication with '%s'@'%s'" % \
-                    (username, blog_url)
+        #assert self.demo_api.sayHello() == "Hello!", \
+        #            "XMLRPC Error with communication with '%s'@'%s'" % \
+        #            (username, blog_url)
 
         self.cache_reset()
         self.post_cache = dict()
@@ -396,8 +400,8 @@ class ContentStruct(object):
     @property
     def META_TEMPLATE(self):
         KEYS_BASIC = ("StrID", "Title", "Slug")
-        KEYS_EXT = ("Cats", "Tags")
-        KEYS_BLOG = ("EditType", "EditFormat", "BlogAddr")
+        KEYS_EXT = ("Cats", "Tags", "Date")
+        KEYS_BLOG = ("EditType", "EditFormat")
 
         pt = ['"{k:<6}: {{{t}}}'.format(k=p, t=p.lower()) for p in KEYS_BASIC]
         if self.EDIT_TYPE == "post":
@@ -414,16 +418,10 @@ class ContentStruct(object):
 
     def __init__(self, edit_type=None, post_id=None):
 
-        self.EDIT_TYPE = edit_type
-        self.buffer_meta = dict(strid='', edittype=edit_type,
-                blogaddr=g_data.blog_url)
+        config = g_data.config[g_data.conf_index]
 
-        self.post_struct_meta = dict(title='',
-                wp_slug='',
-                post_type=edit_type,
-                description='',
-                custom_fields=[],
-                post_status='draft')
+        self.EDIT_TYPE = edit_type
+        self.buffer_meta = dict(strid='', edittype=edit_type, blogaddr=config['blog_url'])
 
         if post_id is not None:
             self.refresh_from_wp(post_id)
@@ -452,7 +450,7 @@ class ContentStruct(object):
 
     def fill_buffer(self):
         meta = dict(strid="", title="", slug="",
-                cats="", tags="", editformat="Markdown", edittype="")
+                cats="", tags="", date="", editformat="Markdown", edittype="")
         meta.update(self.buffer_meta)
         meta_text = self.META_TEMPLATE.format(**meta)\
                 .encode('utf-8').splitlines()
@@ -486,15 +484,26 @@ class ContentStruct(object):
         self.parse_buffer()
 
         meta = self.buffer_meta
-        struct = self.post_struct_meta
+        struct = dict(
+            title='',
+            wp_slug='',
+            post_type=self.EDIT_TYPE,
+            description='',
+            custom_fields=[],
+            post_status='draft')
 
-        struct.update(title=meta["title"],
-                wp_slug=meta["slug"], post_type=self.EDIT_TYPE)
+        struct.update(title = meta["title"],
+                      wp_slug = meta["slug"],
+                      post_type = self.EDIT_TYPE)
 
         if self.EDIT_TYPE == "post":
             struct.update(categories=meta["cats"].split(','),
                     mt_keywords=meta["tags"].split(','))
 
+        if meta.has_key("date") and meta["date"] != '':
+            dt = datetime.datetime.strptime(meta["date"], "%Y%m%dT%H:%M:%S")
+            struct.update(date_created_gmt=xmlrpclib.DateTime(dt))
+            
         self.rawtext = rawtext = meta["content"]
 
         #Translate markdown and save in custom fields.
@@ -508,10 +517,12 @@ class ContentStruct(object):
                 field = dict(key=G.CUSTOM_FIELD_KEY, value=rawtext)
                 struct["custom_fields"].append(field)
 
-            md = markdown.Markdown(extensions=['pretty'])
+            md = markdown.Markdown(extensions=['pretty', 'tables'])
             struct["description"] = self.html_text = md.convert(rawtext)
         else:
             struct["description"] = self.html_text = rawtext
+
+        self.post_struct_meta = struct
 
     def refresh_from_wp(self, post_id):
          # get from wp
@@ -522,6 +533,9 @@ class ContentStruct(object):
         meta = dict(editformat="HTML",
                 title=struct["title"],
                 slug=struct["wp_slug"])
+
+        if self.buffer_meta["date"] == '':
+            meta.update(date=struct["date_created_gmt"])
 
         if self.EDIT_TYPE == "post":
             meta.update(strid=str(struct["postid"]),
@@ -551,7 +565,6 @@ class ContentStruct(object):
             self.raw_text = content
 
         meta["content"] = content
-
         self.buffer_meta.update(meta)
 
     def save_post(self):
@@ -560,15 +573,13 @@ class ContentStruct(object):
             if ps.get("postid", '') == '' and self.post_id == '':
                 post_id = g_data.xmlrpc.new_post(ps)
             else:
-                post_id = ps["postid"] if "postid" in ps \
-                        else int(self.post_id)
+                post_id = ps["postid"] if "postid" in ps else int(self.post_id)
                 g_data.xmlrpc.edit_post(post_id, ps)
         else:
             if ps.get("page_id", '') == '' and self.post_id == '':
                 post_id = g_data.xmlrpc.new_post(ps)
             else:
-                post_id = ps["page_id"] if "page_id" in ps \
-                        else int(self.post_id)
+                post_id = ps["page_id"] if "page_id" in ps else int(self.post_id)
                 g_data.xmlrpc.edit_post(post_id, ps)
 
         self.refresh_from_wp(post_id)
@@ -583,6 +594,13 @@ class ContentStruct(object):
 
     post_id = property(lambda self: self.buffer_meta["strid"])
 
+    post_title = property(lambda self: self.buffer_meta["title"])
+
+    @post_title.setter
+    def post_title(self, data):
+        if data is not None:
+            self.buffer_meta["title"] = data.decode("utf-8")
+
     def html_preview(self):
         """
         Opens a browser with a local preview of the content.
@@ -592,9 +610,10 @@ class ContentStruct(object):
         if g_data.vimpress_temp_dir == '':
             g_data.vimpress_temp_dir = tempfile.mkdtemp(suffix="vimpress")
 
-        html = \
-                u"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <title>Vimpress Local Preview: %(title)s</title> <style type="text/css"> ul, li { margin: 1em; } :link,:visited { text-decoration:none } h1,h2,h3,h4,h5,h6,pre,code { font-size:1.1em; } h1 {font-size: 1.8em;} h2 {font-size: 1.5em;} h3{font-size: 1.3em;} h4{font-size: 1.2em;} h5 {font-size: 1.1em;} a img,:link img,:visited img { border:none } body { margin:0 auto; width:770px; font-family: Helvetica, Arial, Sans-serif; font-size:12px; color:#444; } </style> </meta> </head> <body> %(content)s </body> </html>
-""" % dict(content=self.html_text, title=self.buffer_meta["title"])
+        css_path = os.path.abspath(os.path.join(plugin_dir, os.path.pardir))
+        css_path = css_path + '/themes/preview/github.css'
+
+        html = u"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"> <title>Vimpress Local Preview: %(title)s</title> <link type="text/css" rel="stylesheet" href="%(css)s" /> </meta> </head> <body> %(content)s </body> </html>""" % dict(content=self.html_text, title=self.buffer_meta["title"], css=css_path)
         with open(os.path.join(
                 g_data.vimpress_temp_dir, "vimpress_temp.html"), 'w') as f:
             f.write(html.encode('utf-8'))
@@ -688,9 +707,8 @@ def blog_wise_open_view():
     """
     Wisely decides whether to wipe out the content of current buffer or open a new splited window.
     """
-    if vim.current.buffer.name is None and \
-            (vim.eval('&modified') == '0' or
-                len(vim.current.buffer) == 1):
+
+    if is_str_empty(vim.current.buffer.name) and (vim.eval('&modified') == '0' or len(vim.current.buffer) == 1):
         vim.command('setl modifiable')
         del vim.current.buffer[:]
         vim.command('setl nomodified')
@@ -720,15 +738,11 @@ def blog_save(pub = None):
     Saves the current editing buffer.
     @params pub - either "draft" or "publish"
     """
-    if pub not in ("publish", "draft", None):
-        raise VimPressException(":BlogSave draft|publish")
+    if pub not in ("publish", "draft", "private", None):
+        raise VimPressException(":BlogSave draft|publish|private")
     cp = g_data.current_post
     assert cp is not None, "Can't get current post obj."
     cp.refresh_from_buffer()
-
-    if cp.buffer_meta["blogaddr"] != g_data.blog_url and cp.post_id != '':
-        confirm = vim_input("Are u sure saving it to \"%s\" ? BlogAddr in current buffer does NOT matched. \nStill saving it ? (may cause data lost) [yes/NO]" % g_data.blog_url)
-        assert confirm.lower() == 'yes', "Aborted."
 
     cp.post_status = pub
     cp.save_post()
@@ -736,13 +750,12 @@ def blog_save(pub = None):
     g_data.current_post = cp
     notify = "%s ID=%s saved with status '%s'" % (cp.post_status, cp.post_id, cp.post_status)
     echomsg(notify)
-    vim.command('setl nomodified')
-
+	# vim.command('setl nomodified')
 
 @exception_check
 @vim_encoding_check
 @view_switch(view = "edit")
-def blog_new(edit_type = "post", currentContent = None):
+def blog_new(title, edit_type = "post", currentContent = None):
     """
     Creates a new editing buffer of specified type.
     @params edit_type - either "post" or "page"
@@ -751,9 +764,11 @@ def blog_new(edit_type = "post", currentContent = None):
         raise VimPressException("Invalid option: %s " % edit_type)
     blog_wise_open_view()
     g_data.current_post = ContentStruct(edit_type = edit_type)
+    g_data.current_post.post_title = title
     cp = g_data.current_post
     cp.fill_buffer()
-
+    if title:
+        vim.current.buffer.name = title + ".md"
 
 @view_switch(view = "edit")
 def blog_edit(edit_type, post_id):

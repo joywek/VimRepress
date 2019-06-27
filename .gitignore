@@ -1,2 +1,3 @@
 plugin/lib/*.pyc
 .DS_Store
+plugin/*.swp
